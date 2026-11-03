@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- DO NOT ADD A WEB APP MANIFEST without re-reading showAddToHome(). With no
+     manifest, iOS and Android both save the CURRENT url to the home screen,
+     which is what lets the invite token be put back in the hash for that
+     moment. A manifest's start_url cannot carry it. -->
+<meta name="theme-color" content="#FFFAF3">
+<meta name="robots" content="noindex">
+<title>Trip</title>
+<style>
+  :root {
+    --bg:#FFFAF3; --card:#FFFFFF; --ink:#1F1A17; --muted:#6B5E55; --soft:#F3EDE4;
+    --line:#EADFD2; --accent:#B4441B; --accent-soft:#FDF1EA; --good:#0E6E66; --good-soft:#E5F2F0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 40px);
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+  button { font: inherit; cursor: pointer; }
+
+  header { padding: 18px 0 8px; }
+  header .kicker { font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+  header .row { display: flex; align-items: baseline; gap: 10px; }
+  header h1 { font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.01em; }
+  #status { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  .who { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
+         padding: 4px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; flex-wrap: wrap; }
+  .who b { color: var(--ink); font-weight: 600; }
+  .linkish { color: var(--accent); font-weight: 600; background: none; border: 0; padding: 0; font-size: 13px; }
+
+  .day, .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+  .day-head, .card-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
+  .day-head .d, .card-head .d { font-weight: 700; font-size: 16px; }
+  .day-head .n, .card-head .n { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .day.today { border: 2px solid var(--accent); }
+  .day-head .now { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+                   color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 8px; }
+
+  .item { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .item:last-child { border-bottom: 0; }
+  .item .t { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); min-width: 68px; padding-top: 2px; }
+  .item .body { flex: 1; min-width: 0; }
+  .item .title { font-weight: 600; }
+  .item .detail, .item .by { font-size: 13px; color: var(--muted); }
+  .item .detail { white-space: pre-wrap; word-break: break-word; }
+  .item.booked .title { color: var(--good); }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .map { font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
+  /* A deliberate target, not the whole row: the plan is mostly read. */
+  .item .edit, .exp .edit {
+    flex: 0 0 auto; width: 44px; height: 44px; margin: -6px -6px -6px 0;
+    background: none; border: 0; color: var(--muted); font-size: 17px;
+    display: flex; align-items: center; justify-content: center; border-radius: 10px;
+  }
+  .item .edit:active, .item .cost:active { background: var(--line); }
+  .item .cost { flex: 0 0 auto; height: 44px; padding: 0 8px; margin: -6px 0; background: none; border: 0;
+                color: var(--accent); font-size: 13px; font-weight: 600; border-radius: 10px; }
+  .add { display: block; width: 100%; text-align: left; padding: 11px 14px; background: none; border: 0; color: var(--accent); font-size: 15px; font-weight: 600; }
+  .empty { padding: 12px 14px; color: var(--muted); font-size: 14px; }
+
+  .sheet { position: fixed; inset: 0; background: rgba(31,26,23,.4); display: none; align-items: flex-end; z-index: 20; }
+  .sheet.open { display: flex; }
+  .sheet .panel { background: var(--bg); width: 100%; max-height: 92vh; overflow: auto;
+                  border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+                  max-width: 680px; margin: 0 auto; }
+  .sheet h3 { margin: 0 0 12px; font-size: 17px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=time], input[type=date], textarea, select {
+    width: 100%; font: 16px/1.5 inherit; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 76px; resize: vertical; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 > * { flex: 1; min-width: 0; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 15px; color: var(--ink); }
+  .hint { margin: -6px 0 2px 28px; font-size: 12.5px; color: var(--muted); }
+  .check input { width: 20px; height: 20px; accent-color: var(--good); }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  button.primary { flex: 1; background: var(--ink); color: var(--bg); border: 0; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 700; }
+  button.ghost { background: none; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 16px; color: var(--ink); }
+  button.danger { background: none; border: 0; color: #A8321E; font-size: 15px; padding: 13px 4px; font-weight: 600; }
+
+  .tabs { display: flex; gap: 6px; margin: 0 0 14px; }
+  .tabs button { flex: 1; padding: 9px; border: 1px solid var(--line); background: var(--card);
+                 border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--muted); }
+  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 13px; font-size: 14px; color: var(--ink); }
+  .chip.on { background: var(--good); border-color: var(--good); color: #fff; }
+  .chip.more { color: var(--accent); font-weight: 600; }
+  .exp { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .exp:last-child { border-bottom: 0; }
+  .exp .body { flex: 1; min-width: 0; }
+  .exp .title { font-weight: 600; }
+  .exp .amt { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .exp .sub { font-size: 13px; color: var(--muted); }
+  .owe { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .owe:last-child { border-bottom: 0; }
+  .owe .p { font-weight: 600; }
+  .owe .amt { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .owe.mine { background: var(--good-soft); }
+  .mine-card { padding: 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); margin-bottom: 14px; }
+  .mine-card .l { font-size: 13px; color: var(--muted); }
+  .mine-card .big { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+  .mine-card .big.get { color: var(--good); }
+  .mine-card .big.owes { color: var(--accent); }
+  .mine-card .s { font-size: 13px; color: var(--muted); }
+  .shot { display: block; text-align: center; margin: 4px 0 2px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px;
+          color: var(--accent); font-size: 15px; font-weight: 600; background: var(--card); }
+  .shot.busy { color: var(--muted); border-style: solid; }
+  #a2hs { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px; font-size: 14px; }
+  #a2hs ol { margin: 8px 0; padding-left: 20px; }
+  #a2hs p { margin: 8px 0; color: var(--muted); font-size: 13px; }
+  .settled { padding: 16px 14px; color: var(--good); font-weight: 600; }
+  .totals { display: flex; padding: 4px 0 10px; }
+  .totals div { flex: 1; text-align: center; }
+  .totals .n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .totals .l { font-size: 12px; color: var(--muted); }
+
+  /* The join screen: the first thing a guest sees, from the mockup. */
+  #join { position: fixed; inset: 0; background: var(--bg); z-index: 30; overflow: auto; display: flex; flex-direction: column; }
+  #join .hero { background: var(--accent); color: var(--bg); padding: calc(env(safe-area-inset-top) + 56px) 24px 24px; }
+  #join .hero > div { max-width: 472px; margin: 0 auto; }
+  #join .hero .k { font-size: 13px; font-weight: 600; letter-spacing: .1em; color: #FBE3D6; text-transform: uppercase; }
+  #join .hero h1 { margin: 6px 0; font-size: 32px; line-height: 1.1; font-weight: 800; }
+  #join .hero .s { color: #FBE3D6; }
+  #join .body { padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; }
+  #join h2 { margin: 0 0 12px; font-size: 20px; }
+  #join .list { border-radius: 14px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+  #join .list label { display: flex; justify-content: space-between; align-items: center; margin: 0; padding: 14px 16px;
+                      border-bottom: 1px solid var(--line); font-size: 16px; color: var(--ink); }
+  #join .list label:last-child { border-bottom: 0; }
+  #join .list label.on { background: var(--accent-soft); font-weight: 600; }
+  #join .list input { width: 20px; height: 20px; accent-color: var(--accent); }
+  #join .list .when { color: var(--muted); font-size: 13px; font-weight: 400; }
+  #join .foot { margin: 14px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+  #gate { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 12px; padding: 24px; z-index: 40; text-align: center; }
+  #gate h2 { margin: 0; font-weight: 800; }
+  #gate p { margin: 0; color: var(--muted); font-size: 15px; max-width: 320px; }
+  .err { color: #A8321E; font-size: 13px; min-height: 16px; }
+  .hidden { display: none !important; }
+  .offline { background: #fdf3e7; border: 1px solid #e8d5bb; color: #8a5a2b; border-radius: 10px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div id="app" class="wrap hidden">
+  <header>
+    <div class="kicker" id="range"></div>
+    <div class="row"><h1 id="trip-name">Trip</h1><span id="status"></span></div>
+  </header>
+
+  <div class="who">
+    <span>You are <b id="me">-</b></span>
+    <button class="linkish" onclick="showJoin()">change</button>
+    <span style="margin-left:auto"></span>
+    <button class="linkish hidden" id="a2hs-btn" onclick="showAddToHome()">add to home screen</button>
+    <button class="linkish" onclick="shiftDates()">trip dates</button>
+  </div>
+
+  <div id="a2hs" class="hidden">
+    <b>Save this trip to your home screen</b>
+    <ol id="a2hs-steps"></ol>
+    <p>The address bar is showing the trip's link right now, just so your phone saves it with the shortcut. Tapping Done hides it again.</p>
+    <button class="linkish" onclick="doneAddToHome()">Done</button>
+  </div>
+
+  <div class="tabs">
+    <button id="tab-plan" class="on" onclick="showTab('plan')">Plan</button>
+    <button id="tab-money" onclick="showTab('money')">Money</button>
+  </div>
+
+  <div id="stale" class="offline hidden"></div>
+  <div id="days"></div>
+
+  <div id="money" class="hidden">
+    <div class="mine-card" id="m-mine">
+      <div class="l" id="m-mine-who"></div>
+      <div class="big" id="m-mine-big"></div>
+      <div class="s" id="m-mine-sub"></div>
+    </div>
+    <div class="totals">
+      <div><div class="n" id="m-total">-</div><div class="l">spent together</div></div>
+      <div><div class="n" id="m-each">-</div><div class="l">per party, so far</div></div>
+    </div>
+    <div style="text-align:center;margin:-2px 0 14px">
+      <button class="linkish" id="m-rate" onclick="editRate()"></button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="d">Who is splitting</span></div>
+      <div style="padding:12px 14px"><div class="chips" id="m-people"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="d">Settle up</span><span class="n" id="m-count"></span></div>
+      <div id="m-settle"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="d">Everything so far</span></div>
+      <div id="m-list"></div>
+      <button class="add" onclick="openExpense()">+  Add an expense</button>
+    </div>
+  </div>
+</div>
+
+<div id="sheet" class="sheet" onclick="if(event.target===this) closeSheet()">
+  <div class="panel">
+    <h3 id="sheet-title">Add to the plan</h3>
+    <div class="row2">
+      <div>
+        <label for="f-time">Time <button type="button" class="linkish" style="font-size:11px" onclick="document.getElementById('f-time').value=''">clear</button></label>
+        <input id="f-time" type="time" autocomplete="off">
+      </div>
+      <div>
+        <label for="f-cat">Kind</label>
+        <select id="f-cat">
+          <option value="activity">Activity</option>
+          <option value="food">Food</option>
+          <option value="travel">Travel</option>
+          <option value="stay">Stay</option>
+          <option value="plan">Plan</option>
+          <option value="note">Note</option>
+        </select>
+      </div>
+    </div>
+    <label for="f-title">What</label>
+    <input id="f-title" type="text" placeholder="Prado Museum" autocomplete="off">
+    <label for="f-place">Place or address</label>
+    <input id="f-place" type="text" placeholder="Museo del Prado" autocomplete="off">
+    <label for="f-detail">Notes</label>
+    <textarea id="f-detail" placeholder="Tickets on Ravi's phone, meet at the entrance…"></textarea>
+    <label class="check"><input id="f-booked" type="checkbox"> Booked and paid</label>
+    <p class="hint" id="booked-hint">Ticking this opens the expense sheet next, so it can be split.</p>
+    <div class="actions">
+      <button class="ghost" onclick="closeSheet()">Cancel</button>
+      <button class="primary" onclick="saveItem()">Save</button>
+    </div>
+    <div style="text-align:center"><button class="danger hidden" id="f-del" onclick="deleteItem()">Delete from the plan</button></div>
+    <div class="err" id="sheet-err"></div>
+  </div>
+</div>
+
+<div id="esheet" class="sheet" onclick="if(event.target===this) closeExpense()">
+  <div class="panel">
+    <h3 id="e-title">Add an expense</h3>
+    <label for="e-photo" class="shot" id="e-shot-label"><span id="e-shot-text">📷  Photograph the receipt</span></label>
+    <input id="e-photo" type="file" accept="image/*" capture="environment" style="display:none" onchange="readReceipt(this)">
+    <div class="err" id="e-shot-note" style="color:var(--muted)"></div>
+    <div class="row2">
+      <div>
+        <label for="e-amount">Amount</label>
+        <div style="display:flex;gap:8px">
+          <input id="e-amount" type="text" inputmode="decimal" placeholder="42.50" autocomplete="off" style="flex:1;min-width:0">
+          <select id="e-cur" style="width:88px"></select>
+        </div>
+      </div>
+      <div>
+        <label for="e-date">Day</label>
+        <select id="e-date"></select>
+      </div>
+    </div>
+    <label for="e-what">What for</label>
+    <input id="e-what" type="text" placeholder="Dinner at Botín" autocomplete="off">
+    <label for="e-payer">Who paid</label>
+    <select id="e-payer"></select>
+    <label>Split between</label>
+    <div class="chips" id="e-with" style="margin-top:4px"></div>
+    <div class="actions">
+      <button class="ghost" onclick="closeExpense()">Cancel</button>
+      <button class="primary" onclick="saveExpense()">Save</button>
+    </div>
+    <div style="text-align:center"><button class="danger hidden" id="e-del" onclick="deleteExpense()">Delete this expense</button></div>
+    <div class="err" id="e-err"></div>
+  </div>
+</div>
+
+<div id="join" class="hidden">
+  <div class="hero"><div>
+    <div class="k">You're invited</div>
+    <h1 id="j-name">Trip</h1>
+    <div class="s" id="j-sub"></div>
+  </div></div>
+  <div class="body">
+    <h2>Who are you?</h2>
+    <div class="list" id="j-list"></div>
+    <div class="actions"><button class="primary" id="j-open" onclick="joinAs()">Open the trip</button></div>
+    <div style="text-align:center;margin-top:10px"><button class="linkish" onclick="joinAsNew()">I'm not on this list</button></div>
+    <div class="err" id="j-err"></div>
+    <p class="foot">No app to install, no account to make. Works on iPhone and Android.</p>
+  </div>
+</div>
+
+<div id="gate" class="hidden">
+  <h2>Trip</h2>
+  <p id="gate-msg">Open the link the organiser sent you and the trip opens on its own.</p>
+  <a class="linkish" style="font-size:15px" href="/">Your trips</a>
+</div>
+
+<script>
+const API = '/api';
+const LIST = 'gt.trips';          // { token: { id, name, start, end, me } } for the home page
+const CURRENT = 'gt.current';
+
+let TOKEN = '';
+let trip = null, ME = '';
+let days = [], items = [], people = [], expenses = [];
+let editing = null, editingDay = null, editingExpense = null, expenseItem = null;
+let splitWith = new Set(), cameFromPlan = false, hasJumped = false, tab = 'plan';
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const cacheKey = () => 'gt.cache.' + TOKEN;
+
+// ── Server ──────────────────────────────────────────────────────────────────
+async function api(action, extra) {
+  const r = await fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, t: TOKEN }, extra || {})),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 401) { lockOut(body.error); throw new Error('401'); }
+  if (!r.ok) { const e = new Error(body.error || 'Could not save.'); e.status = r.status; throw e; }
+  return body;
+}
+
+function lockOut(msg) {
+  const list = store.get(LIST, {});
+  delete list[TOKEN];
+  store.set(LIST, list);
+  if (store.get(CURRENT, '') === TOKEN) store.set(CURRENT, '');
+  TOKEN = '';
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('join').classList.add('hidden');
+  document.getElementById('gate').classList.remove('hidden');
+  if (msg) document.getElementById('gate-msg').textContent = msg;
+}
+
+// The link carries the token in its hash: a hash is never sent to a server, so
+// it stays out of logs, and it is wiped from the address bar once read so a
+// screenshot of the page does not hand over the trip.
+function tokenFromLink() {
+  const m = (location.hash || '').match(/^#([A-Za-z0-9_-]{16,64})$/);
+  if (m) history.replaceState(null, '', location.pathname);
+  return m ? m[1] : '';
+}
+
+// ── Loading ─────────────────────────────────────────────────────────────────
+function setStatus(t) { document.getElementById('status').textContent = t; }
+
+function apply(data) {
+  trip = data.trip; days = data.days || []; items = data.items || [];
+  people = data.people || []; expenses = data.expenses || [];
+  if (ME && !people.some(p => p.id === ME)) ME = '';
+}
+
+function remember() {
+  const list = store.get(LIST, {});
+  list[TOKEN] = { id: trip.id, name: trip.name, start: trip.start_date, end: trip.end_date, me: ME, seen: Date.now() };
+  store.set(LIST, list);
+  store.set(CURRENT, TOKEN);
+}
+
+// Whatever was last seen renders before the network is touched, so the plan is
+// readable on bad hotel wifi instead of an empty page.
+function cacheRead() {
+  const c = store.get(cacheKey(), null);
+  if (!c || !c.trip) return false;
+  apply(c);
+  render();
+  showStale(c.at);
+  return true;
+}
+
+function showStale(at) {
+  const el = document.getElementById('stale');
+  const mins = at ? Math.round((Date.now() - at) / 60000) : 0;
+  if (!at || mins < 2) { el.classList.add('hidden'); return; }
+  el.textContent = 'Showing the trip as of ' + (mins < 60 ? mins + ' minutes' : Math.round(mins / 60) + ' hours') + ' ago. Not connected.';
+  el.classList.remove('hidden');
+}
+
+async function load(quiet) {
+  if (!quiet) setStatus('Loading…');
+  try {
+    const data = await api('load');
+    apply(data);
+    store.set(cacheKey(), Object.assign({ at: Date.now() }, data));
+    remember();
+    document.getElementById('stale').classList.add('hidden');
+    render();
+    setStatus('Up to date');
+    return true;
+  } catch (e) {
+    if (String(e.message) === '401') return false;
+    setStatus('Offline');
+    showStale((store.get(cacheKey(), {}) || {}).at);
+    return false;
+  }
+}
+
+// ── Who you are ─────────────────────────────────────────────────────────────
+// Picked once per trip and kept on this phone. Nobody makes an account; the
+// party they pick is who "you" means on the Money tab and who added what.
+const meName = () => (people.find(p => p.id === ME) || {}).name || '';
+
+function showJoin() {
+  document.getElementById('j-name').textContent = trip.name;
+  document.getElementById('j-sub').textContent =
+    rangeText() + ' · ' + people.length + (people.length === 1 ? ' party' : ' parties') + ' · ' + days.length + (days.length === 1 ? ' day' : ' days');
+  const host = document.getElementById('j-list');
+  host.textContent = '';
+  let picked = ME || '';
+  for (const p of people) {
+    const row = el('label', p.id === picked ? 'on' : '');
+    const name = el('span', null, p.name);
+    const when = daysLabel(p);
+    if (when) name.appendChild(el('span', 'when', '  · ' + when));
+    row.appendChild(name);
+    const r = el('input');
+    r.type = 'radio'; r.name = 'who'; r.value = p.id; r.checked = p.id === picked;
+    r.onchange = () => { for (const l of host.children) l.classList.toggle('on', l.contains(r)); };
+    row.appendChild(r);
+    host.appendChild(row);
+  }
+  if (!people.length) host.appendChild(el('div', 'empty', 'Nobody is on the list yet.'));
+  document.getElementById('j-err').textContent = '';
+  document.getElementById('join').classList.remove('hidden');
+}
+
+function joinAs(id) {
+  const chosen = id || (document.querySelector('#j-list input:checked') || {}).value;
+  if (!chosen) { document.getElementById('j-err').textContent = 'Pick who you are first.'; return; }
+  ME = chosen;
+  remember();
+  document.getElementById('join').classList.add('hidden');
+  render();
+}
+
+async function joinAsNew() {
+  const n = prompt('Your name, as everyone on the trip knows you. A couple can be one name, like "Ravi & Meera".', '');
+  if (n === null || !n.trim()) return;
+  try {
+    const { person } = await api('person_save', { person: { name: n.trim() } });
+    await load(true);
+    joinAs(person.id);
+  } catch (e) { document.getElementById('j-err').textContent = e.message; }
+}
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+// Local parts, not toISOString: that converts to UTC first, and half past
+// midnight in Madrid is still yesterday in UTC.
+function todayISO() {
+  const d = new Date(), pad = (x) => String(x).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+function fmtTime(t) {
+  const m = String(t || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return t || '';
+  const h = Number(m[1]);
+  return (h % 12 === 0 ? 12 : h % 12) + ':' + m[2] + ' ' + (h < 12 ? 'AM' : 'PM');
+}
+
+function fmtDay(iso) {
+  return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function rangeText() {
+  if (!days.length) return '';
+  return fmtDay(days[0].date) + ' to ' + fmtDay(days[days.length - 1].date);
+}
+
+// Built as DOM nodes, never as an HTML string: everything here was typed by
+// somebody else on the trip.
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function render() {
+  if (!trip) return;
+  document.title = trip.name;
+  document.getElementById('trip-name').textContent = trip.name;
+  document.getElementById('range').textContent = rangeText();
+  document.getElementById('me').textContent = meName() || '-';
+  renderMoney();
+  if (!hasJumped) setTimeout(jumpToToday, 0);
+
+  const host = document.getElementById('days');
+  host.textContent = '';
+  for (const day of days) {
+    const mine = items.filter(x => x.day_id === day.id);
+    const card = el('div', 'day');
+    card.dataset.day = day.id;
+    const isToday = day.date === todayISO();
+    if (isToday) card.classList.add('today');
+
+    const head = el('div', 'day-head');
+    head.appendChild(el('span', 'd', fmtDay(day.date)));
+    const city = el('button', 'city linkish', day.city || 'set city');
+    city.style.fontSize = '14px';
+    city.onclick = () => editCity(day);
+    head.appendChild(city);
+    if (isToday) head.appendChild(el('span', 'now', 'today'));
+    head.appendChild(el('span', 'n', mine.length ? mine.length + (mine.length === 1 ? ' thing' : ' things') : ''));
+    card.appendChild(head);
+
+    if (!mine.length) card.appendChild(el('div', 'empty', 'Nothing planned yet.'));
+    for (const it of mine) card.appendChild(itemRow(it));
+
+    const add = el('button', 'add', '+  Add something');
+    add.onclick = () => openSheet(day, null);
+    card.appendChild(add);
+    host.appendChild(card);
+  }
+}
+
+// Once only: the page refreshes itself every twenty seconds, and yanking it
+// back to today while somebody reads Thursday would be worse than not jumping.
+function jumpToToday() {
+  if (hasJumped || tab !== 'plan') return;
+  const day = days.find(d => d.date === todayISO());
+  if (!day) { hasJumped = true; return; }
+  const card = document.querySelector('[data-day="' + day.id + '"]');
+  if (!card) return;
+  hasJumped = true;
+  if (card.scrollIntoView) card.scrollIntoView({ block: 'start' });
+}
+
+// Kinds that can carry a shared bill. Flights and hotels are usually booked per
+// party already, and a cost button beside them exists to be pressed by mistake;
+// an odd one can still be added from the Money tab.
+const SPLITTABLE = new Set(['activity', 'plan', 'food']);
+
+function itemRow(it) {
+  const row = el('div', 'item' + (it.booked ? ' booked' : ''));
+  row.appendChild(el('div', 't', fmtTime(it.at_time)));
+  const body = el('div', 'body');
+  body.appendChild(el('div', 'title', (it.booked ? '✓ ' : '') + (it.title || 'Untitled')));
+  if (it.detail) body.appendChild(el('div', 'detail', it.detail));
+  const foot = el('div', 'by');
+  if (it.category && it.category !== 'plan' && it.category !== 'activity') foot.appendChild(el('span', 'tag', it.category + ' '));
+  if (it.author) foot.appendChild(el('span', null, 'added by ' + it.author + ' '));
+  if (it.place) {
+    const a = el('a', 'map', 'Map');
+    a.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(it.place);
+    a.target = '_blank'; a.rel = 'noopener';
+    foot.appendChild(a);
+  }
+  if (foot.childNodes.length) body.appendChild(foot);
+  row.appendChild(body);
+
+  if (SPLITTABLE.has(it.category || 'activity')) {
+    const cost = el('button', 'cost', 'cost');
+    cost.setAttribute('aria-label', 'Add what ' + (it.title || 'this') + ' cost');
+    cost.onclick = () => openExpenseForItem(it);
+    row.appendChild(cost);
+  }
+  const edit = el('button', 'edit', '✎');
+  edit.setAttribute('aria-label', 'Edit ' + (it.title || 'this'));
+  edit.onclick = () => openSheet(null, it);
+  row.appendChild(edit);
+  return row;
+}
+
+// ── Editing the plan ────────────────────────────────────────────────────────
+function openSheet(day, item) {
+  editing = item; editingDay = day || days.find(d => d.id === (item && item.day_id));
+  document.getElementById('sheet-title').textContent = item ? 'Edit' : 'Add to ' + (editingDay ? fmtDay(editingDay.date) : 'the plan');
+  document.getElementById('f-time').value   = item ? (item.at_time || '') : '';
+  document.getElementById('f-title').value  = item ? (item.title || '') : '';
+  document.getElementById('f-place').value  = item ? (item.place || '') : '';
+  document.getElementById('f-detail').value = item ? (item.detail || '') : '';
+  document.getElementById('f-cat').value    = item ? (item.category || 'activity') : 'activity';
+  document.getElementById('f-booked').checked = item ? !!item.booked : false;
+  updateBookedHint();
+  document.getElementById('f-del').classList.toggle('hidden', !item);
+  document.getElementById('sheet-err').textContent = '';
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet() { document.getElementById('sheet').classList.remove('open'); editing = null; }
+
+function updateBookedHint() {
+  const already = !!(editing && editing.booked);
+  document.getElementById('booked-hint').classList.toggle('hidden', already || !SPLITTABLE.has(document.getElementById('f-cat').value));
+}
+document.getElementById('f-cat').addEventListener('change', updateBookedHint);
+
+async function saveItem() {
+  const err = document.getElementById('sheet-err');
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { err.textContent = 'Give it a name.'; return; }
+  const wasBooked = !!(editing && editing.booked);
+  const dayOfItem = editingDay;
+  const item = {
+    at_time: document.getElementById('f-time').value.trim(),
+    title,
+    place: document.getElementById('f-place').value.trim(),
+    detail: document.getElementById('f-detail').value.trim(),
+    category: document.getElementById('f-cat').value,
+    booked: document.getElementById('f-booked').checked,
+    author: meName() || 'someone',
+  };
+  if (editing) item.id = editing.id; else item.day_id = editingDay.id;
+
+  setStatus('Saving…');
+  try {
+    const saved = (await api('item_save', { item })).item;
+    closeSheet();
+    await load(true);
+    // Somebody who has just ticked "booked and paid" is holding the receipt,
+    // and this is the moment they remember the number. Only on the tick
+    // itself, so fixing a typo later does not reopen the money sheet.
+    if (item.booked && !wasBooked && SPLITTABLE.has(item.category) && people.length) {
+      openExpense(null, { description: item.title, spent_on: dayOfItem && dayOfItem.date, item_id: saved.id, fromPlan: true });
+    }
+  } catch (e) {
+    if (e.message === '401') return;
+    err.textContent = e.status === 404 ? e.message : 'Could not save. Check your connection and try again.';
+    setStatus('Not saved');
+  }
+}
+
+async function deleteItem() {
+  if (!editing) return;
+  if (!confirm('Delete "' + (editing.title || 'this') + '" from the plan?\n\nEveryone loses it, and there is no undo.')) return;
+  setStatus('Removing…');
+  try { await api('item_delete', { id: editing.id }); closeSheet(); await load(true); }
+  catch (e) { setStatus('Not removed'); }
+}
+
+async function editCity(day) {
+  const c = prompt('Which city on ' + fmtDay(day.date) + '?', day.city || '');
+  if (c === null) return;
+  setStatus('Saving…');
+  try { await api('day_save', { id: day.id, city: c.trim() }); await load(true); }
+  catch (e) { setStatus('Not saved'); }
+}
+
+async function shiftDates() {
+  if (!days.length) return;
+  const first = prompt('First day of the trip, as YYYY-MM-DD. Every day moves with it, and plans stay on their day.', days[0].date);
+  if (first === null) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(first.trim())) { alert('Use the form 2026-10-10.'); return; }
+  setStatus('Saving…');
+  try { await api('dates_shift', { first: first.trim() }); await load(true); }
+  catch (e) { setStatus('Not saved'); }
+}
+
+// ── Money ───────────────────────────────────────────────────────────────────
+function showTab(which) {
+  tab = which;
+  document.getElementById('tab-plan').classList.toggle('on', which === 'plan');
+  document.getElementById('tab-money').classList.toggle('on', which === 'money');
+  document.getElementById('days').classList.toggle('hidden', which !== 'plan');
+  document.getElementById('money').classList.toggle('hidden', which !== 'money');
+}
+
+const twoCurrencies = () => trip && trip.currency !== trip.home_currency;
+function money(cents, cur) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(cents / 100); }
+  catch (e) { return cur + ' ' + (cents / 100).toFixed(2); }
+}
+const local = (cents) => money(cents, trip.currency);
+const home = (cents) => money(Math.round(cents * trip.rate), trip.home_currency);
+const both = (cents) => twoCurrencies() ? local(cents) + ' · ' + home(cents) : local(cents);
+
+// Everything nets in the local currency, rounded to the cent on the way in so
+// the balances still land on exactly zero.
+function toLocalCents(amountCents, currency) {
+  return twoCurrencies() && currency === trip.home_currency ? Math.round(amountCents / trip.rate) : amountCents;
+}
+
+// Splits an amount so the parts add back up to it exactly: 100.00 three ways
+// is 33.34, 33.33 and 33.33. The odd cents go to the first few.
+function shareOut(cents, ids) {
+  const out = {}, n = ids.length;
+  if (!n) return out;
+  const base = Math.floor(cents / n);
+  let extra = cents - base * n;
+  for (const id of ids) { out[id] = base + (extra > 0 ? 1 : 0); if (extra > 0) extra--; }
+  return out;
+}
+
+// Who owes whom, in as few payments as possible: net everyone off, then settle
+// the largest debt against the largest credit. At most one payment fewer than
+// there are parties.
+function settleUp(peopleList, expenseList) {
+  const net = {};
+  for (const p of peopleList) net[p.id] = 0;
+  let total = 0;
+  for (const e of expenseList) {
+    const amount = toLocalCents(e.amount_cents || 0, e.currency);
+    const withIds = (e.shared_with || []).filter(id => id in net);
+    if (!amount || !withIds.length) continue;
+    total += amount;
+    if (e.paid_by in net) net[e.paid_by] += amount;
+    const parts = shareOut(amount, withIds);
+    for (const id of withIds) net[id] -= parts[id];
+  }
+  const owe = peopleList.filter(p => net[p.id] < 0).map(p => ({ id: p.id, amount: -net[p.id] }));
+  const due = peopleList.filter(p => net[p.id] > 0).map(p => ({ id: p.id, amount: net[p.id] }));
+  owe.sort((a, b) => b.amount - a.amount);
+  due.sort((a, b) => b.amount - a.amount);
+  const transfers = [];
+  let i = 0, j = 0;
+  while (i < owe.length && j < due.length) {
+    const pay = Math.min(owe[i].amount, due[j].amount);
+    if (pay > 0) transfers.push({ from: owe[i].id, to: due[j].id, amount: pay });
+    owe[i].amount -= pay; due[j].amount -= pay;
+    if (owe[i].amount === 0) i++;
+    if (due[j].amount === 0) j++;
+  }
+  return { net, transfers, total };
+}
+
+const personName = (id) => (people.find(p => p.id === id) || {}).name || 'someone';
+const nameOrYou = (id) => id === ME ? 'You' : personName(id);
+
+// Whether a party is on the trip on a given day, so a dinner before somebody
+// arrives is not quietly billed to them.
+function presentOn(p, date) {
+  if (!date) return true;
+  if (p.from_date && date < p.from_date) return false;
+  if (p.to_date && date > p.to_date) return false;
+  return true;
+}
+
+function daysLabel(p) {
+  if (!p.from_date && !p.to_date) return '';
+  if (p.from_date && !p.to_date) return 'from ' + fmtDay(p.from_date);
+  if (!p.from_date) return 'until ' + fmtDay(p.to_date);
+  return fmtDay(p.from_date) + ' to ' + fmtDay(p.to_date);
+}
+
+// "11 to 15" rather than two full dates: the day of the month is unambiguous
+// on a trip, and nobody types ISO dates on a phone.
+function resolveTripDate(token) {
+  const t = String(token).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const n = parseInt(t, 10);
+  if (!(n >= 1 && n <= 31)) return null;
+  const hit = days.find(d => Number(d.date.slice(8, 10)) === n);
+  return hit ? hit.date : null;
+}
+function parseStay(text) {
+  const t = String(text).trim();
+  if (!t) return null;
+  const parts = t.split(/\s*(?:to|until|through|–|—|-)\s*/).filter(Boolean);
+  if (parts.length === 6) return [parts.slice(0, 3).join('-'), parts.slice(3).join('-')];
+  if (parts.length !== 2) return null;
+  const from = resolveTripDate(parts[0]), to = resolveTripDate(parts[1]);
+  return from && to ? [from, to] : null;
+}
+const shortRange = (from, to) => Number(from.slice(8, 10)) + ' to ' + Number(to.slice(8, 10));
+
+async function editRate() {
+  if (!twoCurrencies()) return;
+  const r = prompt('How many ' + trip.home_currency + ' to one ' + trip.currency + '? Everyone is converted by the same number, which is what makes it fair.', String(trip.rate));
+  if (r === null) return;
+  setStatus('Saving…');
+  try { await api('rate_save', { rate: r }); await load(true); }
+  catch (e) { alert(e.message); setStatus('Not saved'); }
+}
+
+function renderMoney() {
+  const { net, transfers, total } = settleUp(people, expenses);
+  document.getElementById('m-total').textContent = people.length ? both(total) : '-';
+  document.getElementById('m-each').textContent = people.length ? local(Math.round(total / people.length)) : '-';
+  const rate = document.getElementById('m-rate');
+  rate.classList.toggle('hidden', !twoCurrencies());
+  if (twoCurrencies()) rate.textContent = 'Converting at ' + money(100, trip.currency) + ' = ' + money(Math.round(100 * trip.rate), trip.home_currency) + '. Tap to change.';
+
+  // Your own position first: the one number each person opens this tab for.
+  const mine = document.getElementById('m-mine');
+  mine.classList.toggle('hidden', !ME);
+  if (ME) {
+    const n = net[ME] || 0, big = document.getElementById('m-mine-big');
+    document.getElementById('m-mine-who').textContent = meName();
+    big.className = 'big' + (n > 0 ? ' get' : n < 0 ? ' owes' : '');
+    big.textContent = n > 0 ? 'You get back ' + local(n) : n < 0 ? 'You owe ' + local(-n) : 'You are all square';
+    document.getElementById('m-mine-sub').textContent = n && twoCurrencies() ? 'About ' + home(Math.abs(n)) + ' at the trip rate.' : '';
+  }
+
+  const chips = document.getElementById('m-people');
+  chips.textContent = '';
+  for (const p of people) {
+    const label = daysLabel(p);
+    const c = el('button', 'chip', p.name + (label ? '  · ' + label : ''));
+    c.onclick = () => renamePerson(p);
+    chips.appendChild(c);
+  }
+  const add = el('button', 'chip more', people.length ? '+ add' : '+ add everyone splitting');
+  add.onclick = addPerson;
+  chips.appendChild(add);
+
+  const settle = document.getElementById('m-settle');
+  settle.textContent = '';
+  document.getElementById('m-count').textContent = transfers.length ? transfers.length + (transfers.length === 1 ? ' payment' : ' payments') : '';
+  if (!people.length) settle.appendChild(el('div', 'empty', 'Add everyone splitting first. A couple works well as one name.'));
+  else if (!transfers.length) settle.appendChild(el('div', 'settled', expenses.length ? 'All square.' : 'Nothing spent yet.'));
+  else for (const t of transfers) {
+    const row = el('div', 'owe' + (t.from === ME || t.to === ME ? ' mine' : ''));
+    row.appendChild(el('span', 'p', nameOrYou(t.from)));
+    row.appendChild(el('span', null, t.from === ME ? 'pay' : 'pays'));
+    row.appendChild(el('span', 'p', t.to === ME ? 'you' : personName(t.to)));
+    row.appendChild(el('span', 'amt', both(t.amount)));
+    settle.appendChild(row);
+  }
+
+  const list = document.getElementById('m-list');
+  list.textContent = '';
+  if (!expenses.length) list.appendChild(el('div', 'empty', 'Nothing yet.'));
+  for (const e of expenses) {
+    const row = el('div', 'exp');
+    const body = el('div', 'body');
+    body.appendChild(el('div', 'title', e.description || 'Expense'));
+    const n = (e.shared_with || []).length;
+    body.appendChild(el('div', 'sub',
+      'Paid by ' + (e.paid_by === ME ? 'you' : personName(e.paid_by)) + (n ? ', split ' + n + (n === 1 ? ' way' : ' ways') : '') +
+      (e.spent_on ? ' · ' + fmtDay(e.spent_on) : '')));
+    row.appendChild(body);
+    const amt = el('div', 'amt', money(e.amount_cents || 0, e.currency));
+    if (twoCurrencies() && e.currency === trip.home_currency) amt.title = 'about ' + local(toLocalCents(e.amount_cents, e.currency));
+    row.appendChild(amt);
+    const edit = el('button', 'edit', '✎');
+    edit.setAttribute('aria-label', 'Edit ' + (e.description || 'this expense'));
+    edit.onclick = () => openExpense(e);
+    row.appendChild(edit);
+    list.appendChild(row);
+  }
+}
+
+async function addPerson() {
+  const n = prompt('Name. A couple counts as one, so "Ravi & Meera" is fine.', '');
+  if (n === null || !n.trim()) return;
+  setStatus('Saving…');
+  try { await api('person_save', { person: { name: n.trim() } }); await load(true); }
+  catch (e) { setStatus('Not saved'); }
+}
+
+async function renamePerson(p) {
+  const n = prompt('Rename, or clear the box to remove them.', p.name);
+  if (n === null) return;
+  try {
+    if (!n.trim()) {
+      if (!confirm('Remove ' + p.name + ', and every expense they paid for?')) return;
+      setStatus('Saving…');
+      await api('person_delete', { id: p.id });
+    } else {
+      const when = prompt('Which days are they here for?\n\nJust the dates of the month is enough, like  11 to 15.\nLeave it blank if they are there for the whole trip.',
+        p.from_date && p.to_date ? shortRange(p.from_date, p.to_date) : '');
+      if (when === null) return;
+      const m = parseStay(when);
+      setStatus('Saving…');
+      await api('person_save', { person: { id: p.id, name: n.trim(), from_date: m ? m[0] : null, to_date: m ? m[1] : null, pay_handle: p.pay_handle || '' } });
+    }
+    await load(true);
+  } catch (e) { setStatus('Not saved'); }
+}
+
+function openExpenseForItem(it) {
+  if (!people.length) { showTab('money'); addPerson(); return; }
+  const day = days.find(d => d.id === it.day_id);
+  openExpense(null, { description: it.title || '', spent_on: day && day.date, item_id: it.id, fromPlan: true });
+}
+
+function openExpense(e, prefill) {
+  if (!people.length) { addPerson(); return; }
+  editingExpense = e || null;
+  expenseItem = e ? e.item_id : (prefill && prefill.item_id) || null;
+  cameFromPlan = !!(prefill && prefill.fromPlan);
+  document.getElementById('e-title').textContent = e ? 'Edit expense' : 'Add an expense';
+  document.getElementById('e-amount').value = e ? (e.amount_cents / 100).toFixed(2) : '';
+  const cur = document.getElementById('e-cur');
+  cur.textContent = '';
+  for (const c of twoCurrencies() ? [trip.currency, trip.home_currency] : [trip.currency]) {
+    const o = el('option', null, c); o.value = c; cur.appendChild(o);
+  }
+  cur.value = e ? e.currency : trip.currency;
+  document.getElementById('e-what').value = e ? (e.description || '') : ((prefill && prefill.description) || '');
+  document.getElementById('e-err').textContent = '';
+  document.getElementById('e-del').classList.toggle('hidden', !e);
+
+  const payer = document.getElementById('e-payer');
+  payer.textContent = '';
+  for (const p of people) { const o = el('option', null, p.name); o.value = p.id; payer.appendChild(o); }
+  // Whoever is holding the phone is almost always who paid.
+  payer.value = e ? e.paid_by : (ME || people[0].id);
+
+  const dsel = document.getElementById('e-date');
+  dsel.textContent = '';
+  for (const d of days) { const o = el('option', null, fmtDay(d.date) + (d.city ? ' · ' + d.city : '')); o.value = d.date; dsel.appendChild(o); }
+  dsel.value = e ? e.spent_on : ((prefill && prefill.spent_on) || (days.find(d => d.date === todayISO()) || days[0] || {}).date);
+
+  // Everybody there that day, by default: deselecting two is faster than
+  // selecting six.
+  splitWith = new Set(e ? (e.shared_with || []) : people.filter(p => presentOn(p, dsel.value)).map(p => p.id));
+  renderSplitChips();
+  dsel.onchange = () => {
+    if (editingExpense) return;
+    splitWith = new Set(people.filter(p => presentOn(p, dsel.value)).map(p => p.id));
+    renderSplitChips();
+  };
+  resetShot();
+  document.getElementById('esheet').classList.add('open');
+}
+
+function renderSplitChips() {
+  const host = document.getElementById('e-with');
+  host.textContent = '';
+  const when = document.getElementById('e-date').value;
+  for (const p of people) {
+    const away = !presentOn(p, when);
+    const c = el('button', 'chip' + (splitWith.has(p.id) ? ' on' : ''), p.name + (away ? '  (not here)' : ''));
+    if (away && !splitWith.has(p.id)) c.style.opacity = '0.45';
+    c.onclick = () => { if (splitWith.has(p.id)) splitWith.delete(p.id); else splitWith.add(p.id); renderSplitChips(); };
+    host.appendChild(c);
+  }
+}
+
+function closeExpense() {
+  document.getElementById('esheet').classList.remove('open');
+  editingExpense = null;
+  resetShot();
+}
+
+// ── Reading a receipt ───────────────────────────────────────────────────────
+function resetShot() {
+  document.getElementById('e-shot-label').classList.remove('busy');
+  document.getElementById('e-shot-text').textContent = '📷  Photograph the receipt';
+  document.getElementById('e-shot-note').textContent = '';
+  document.getElementById('e-photo').value = '';
+}
+
+// Shrunk before it leaves the phone: a 4 MB photo from hotel wifi is slow
+// enough that people give up and type the number. Drawing to a canvas also
+// bakes in the rotation, so a sideways photo is not read upside down.
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const dataURL = c.toDataURL('image/jpeg', 0.8);
+      resolve(dataURL.slice(dataURL.indexOf(',') + 1));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
+async function readReceipt(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const label = document.getElementById('e-shot-label'), text = document.getElementById('e-shot-text'), note = document.getElementById('e-shot-note');
+  label.classList.add('busy'); text.textContent = 'Reading the receipt…'; note.textContent = '';
+  try {
+    const data = await shrinkImage(file);
+    const j = await api('receipt_read', { image: { data, mediaType: 'image/jpeg' }, dates: days.map(d => d.date), person_id: ME });
+    // PREFILLED, never saved: Save is still what commits it.
+    if (j.amount) document.getElementById('e-amount').value = j.amount;
+    if (j.currency && Array.from(document.getElementById('e-cur').options).some(o => o.value === j.currency)) document.getElementById('e-cur').value = j.currency;
+    if (j.description && !document.getElementById('e-what').value.trim()) document.getElementById('e-what').value = j.description;
+    const dsel = document.getElementById('e-date');
+    if (j.date && Array.from(dsel.options).some(o => o.value === j.date)) {
+      dsel.value = j.date;
+      if (!editingExpense) { splitWith = new Set(people.filter(p => presentOn(p, j.date)).map(p => p.id)); renderSplitChips(); }
+    }
+    label.classList.remove('busy');
+    text.textContent = '📷  Photograph a different receipt';
+    note.style.color = 'var(--muted)';
+    const bits = ['Check the amount before saving.'];
+    if (!j.amount) bits.push('It could not find a total.');
+    if (j.note) bits.push(j.note);
+    note.textContent = bits.join(' ');
+  } catch (e) {
+    label.classList.remove('busy');
+    text.textContent = '📷  Try another photo';
+    note.style.color = '#A8321E';
+    note.textContent = e.message && e.message !== 'unreadable' && e.message !== '401' ? e.message : 'That photo could not be read. Type the amount in instead.';
+    input.value = '';
+  }
+}
+
+// Reads "42.50" as 4250 off the text: 42.50 * 100 is 4249.999... in binary.
+function toCents(text) {
+  const m = String(text).trim().replace(',', '.').match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 100 + parseInt((m[2] || '0').padEnd(2, '0'), 10);
+}
+
+async function saveExpense() {
+  const err = document.getElementById('e-err');
+  const cents = toCents(document.getElementById('e-amount').value);
+  if (cents === null || cents <= 0) { err.textContent = 'Give it an amount, like 42.50.'; return; }
+  const what = document.getElementById('e-what').value.trim();
+  if (!what) { err.textContent = 'Say what it was for.'; return; }
+  if (!splitWith.size) { err.textContent = 'Somebody has to be splitting it.'; return; }
+  const expense = {
+    description: what, amount_cents: cents,
+    currency: document.getElementById('e-cur').value,
+    paid_by: document.getElementById('e-payer').value,
+    shared_with: Array.from(splitWith),
+    spent_on: document.getElementById('e-date').value || null,
+    item_id: expenseItem,
+    author: meName() || 'someone',
+  };
+  if (editingExpense) expense.id = editingExpense.id;
+  setStatus('Saving…');
+  try {
+    await api('expense_save', { expense });
+    closeExpense();
+    if (cameFromPlan) { showTab('money'); cameFromPlan = false; }
+    await load(true);
+  } catch (e) {
+    if (e.message === '401') return;
+    err.textContent = e.status === 400 || e.status === 404 ? e.message : 'Could not save. Check your connection.';
+    setStatus('Not saved');
+  }
+}
+
+async function deleteExpense() {
+  if (!editingExpense) return;
+  if (!confirm('Delete "' + (editingExpense.description || 'this') + '"?\n\nEveryone loses it, and there is no undo.')) return;
+  setStatus('Removing…');
+  try { await api('expense_delete', { id: editingExpense.id }); closeExpense(); await load(true); }
+  catch (e) { setStatus('Not removed'); }
+}
+
+// ── Saving a shortcut that actually opens ───────────────────────────────────
+// The token is wiped from the address bar once read, so Add to Home Screen
+// would save a link with nothing in it, and a home-screen app gets its own
+// storage on iOS. So the hash goes back for the few seconds the phone needs.
+function addToHomeSteps() {
+  const android = /Android/i.test(navigator.userAgent);
+  const steps = android
+    ? ['Tap the <b>⋮</b> menu, top right of Chrome', 'Tap <b>Add to Home screen</b>', 'Come back here and tap Done']
+    : ['Tap <b>Share</b> at the bottom of Safari', 'Tap <b>Add to Home Screen</b>', 'Come back here and tap Done'];
+  document.getElementById('a2hs-steps').innerHTML = steps.map((t) => '<li>' + t + '</li>').join('');
+}
+function showAddToHome() {
+  addToHomeSteps();
+  history.replaceState(null, '', location.pathname + '#' + TOKEN);
+  document.getElementById('a2hs').classList.remove('hidden');
+  document.getElementById('a2hs').scrollIntoView({ block: 'center' });
+}
+function doneAddToHome() { document.getElementById('a2hs').classList.add('hidden'); hideTheToken(); }
+function hideTheToken() { if (location.hash) history.replaceState(null, '', location.pathname); }
+window.addEventListener('pagehide', hideTheToken);
+document.addEventListener('visibilitychange', () => { if (document.hidden) hideTheToken(); });
+function updateAddToHomeButton() {
+  const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  document.getElementById('a2hs-btn').classList.toggle('hidden', standalone);
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+async function boot() {
+  TOKEN = tokenFromLink() || store.get(CURRENT, '');
+  if (!TOKEN) { document.getElementById('gate').classList.remove('hidden'); return; }
+  ME = (store.get(LIST, {})[TOKEN] || {}).me || '';
+  document.getElementById('app').classList.remove('hidden');
+  updateAddToHomeButton();
+  const cached = cacheRead();
+  const ok = await load();
+  if (!ok && !cached) return;
+  if (!ME) showJoin();
+}
+
+// Other people edit the same trip, so it refreshes on a slow timer and when
+// the phone comes back to it.
+setInterval(() => { if (TOKEN && trip && document.visibilityState === 'visible') load(true); }, 20000);
+document.addEventListener('visibilitychange', () => { if (TOKEN && trip && document.visibilityState === 'visible') load(true); });
+
+boot();
+</script>
+</body>
+</html>

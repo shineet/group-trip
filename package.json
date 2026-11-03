@@ -1,0 +1,12 @@
+{
+  "name": "group-trip",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev/serve.js",
+    "test": "node test/api.test.js && node test/drive.js"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFAF3">
+<title>Group Trip</title>
+<style>
+  :root {
+    --bg:#FFFAF3; --card:#FFFFFF; --ink:#1F1A17; --muted:#6B5E55; --soft:#F3EDE4;
+    --line:#EADFD2; --accent:#B4441B; --accent-soft:#FDF1EA; --good:#0E6E66; --good-soft:#E5F2F0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+         padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 40px); -webkit-text-size-adjust: 100%; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+  button { font: inherit; cursor: pointer; }
+  header { padding: 28px 0 8px; display: flex; align-items: baseline; gap: 10px; }
+  header h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+  header .out { margin-left: auto; }
+  .lede { color: var(--muted); margin: 0 0 20px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 22px 4px 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
+  .trip { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .trip:last-child { border-bottom: 0; }
+  .trip .n { font-weight: 700; font-size: 17px; text-decoration: none; color: var(--ink); display: block; }
+  .trip .d { color: var(--muted); font-size: 13px; }
+  .trip .acts { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+  .linkish { color: var(--accent); font-weight: 600; background: none; border: 0; padding: 0; font-size: 14px; text-decoration: none; }
+  .empty { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+  button.primary { width: 100%; background: var(--ink); color: var(--bg); border: 0; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 700; }
+  button.ghost { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; font-size: 16px; color: var(--ink); font-weight: 600; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .form { padding: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], input[type=email], input[type=date], textarea, select {
+    width: 100%; font: 16px/1.5 inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 > * { flex: 1; min-width: 0; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+  .err { color: #A8321E; font-size: 13px; min-height: 18px; margin-top: 8px; }
+  .share { padding: 16px; background: var(--good-soft); border: 1px solid #BFDDD8; border-radius: 16px; margin-bottom: 12px; }
+  .share b { display: block; font-size: 17px; margin-bottom: 4px; }
+  .share code { display: block; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; word-break: break-all; margin: 10px 0; }
+  .share .acts { display: flex; gap: 10px; }
+  .share .acts button { flex: 1; }
+  .divider { text-align: center; color: var(--muted); font-size: 13px; margin: 4px 0; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Group Trip</h1>
+    <button class="linkish out hidden" id="signout" onclick="signOut()">Sign out</button>
+  </header>
+  <p class="lede">Plan it together; the money sorts itself out. Your friends open one link, with nothing to install.</p>
+
+  <div id="share" class="share hidden">
+    <b id="share-title">Your trip is ready</b>
+    <span class="hint">Send this link to everyone on the trip. Anyone with it can see and edit the plan.</span>
+    <code id="share-link"></code>
+    <div class="acts">
+      <button class="ghost" onclick="copyLink(this)">Copy link</button>
+      <button class="primary" id="share-native" onclick="shareLink()">Share</button>
+    </div>
+    <div style="text-align:center;margin-top:10px"><a class="linkish" id="share-open" href="#">Open the trip</a></div>
+  </div>
+
+  <section id="signed-in" class="hidden">
+    <h2>Trips you organise</h2>
+    <div class="card" id="mine"></div>
+    <button class="primary" onclick="showCreate()" id="create-btn">Plan a new trip</button>
+
+    <div class="card hidden" id="create" style="margin-top:12px">
+      <div class="form">
+        <label for="c-name">Trip name</label>
+        <input id="c-name" type="text" placeholder="Madrid & Barcelona" autocomplete="off">
+        <div class="row2">
+          <div><label for="c-start">First day</label><input id="c-start" type="date"></div>
+          <div><label for="c-end">Last day</label><input id="c-end" type="date"></div>
+        </div>
+        <div class="row2">
+          <div><label for="c-cur">Spending in</label><select id="c-cur"></select></div>
+          <div><label for="c-home">Your home currency</label><select id="c-home"></select></div>
+        </div>
+        <div id="c-rate-row" class="hidden">
+          <label for="c-rate" id="c-rate-label">Agreed rate</label>
+          <input id="c-rate" type="text" inputmode="decimal" placeholder="1.08" autocomplete="off">
+          <p class="hint">One rate for the whole trip. Everyone is converted by the same number, which is what keeps it fair.</p>
+        </div>
+        <label for="c-people">Who is going</label>
+        <textarea id="c-people" placeholder="One per line. A couple can share a line:&#10;Shine & Nadia&#10;Ravi & Meera&#10;Dan & Kate"></textarea>
+        <p class="hint">Couples on one line settle up as one. You can add people later too.</p>
+        <div class="stack" style="margin-top:14px">
+          <button class="primary" onclick="createTrip()">Create the trip</button>
+          <button class="ghost" onclick="hideCreate()">Cancel</button>
+        </div>
+        <div class="err" id="c-err"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="signed-out" class="hidden">
+    <h2>Organising a trip?</h2>
+    <div class="card"><div class="form stack">
+      <button class="ghost" id="b-apple" onclick="oauth('apple')">Continue with Apple</button>
+      <button class="ghost" id="b-google" onclick="oauth('google')">Continue with Google</button>
+      <div class="divider">or</div>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+      <button class="primary" onclick="emailLink()">Email me a sign-in link</button>
+      <button class="ghost hidden" id="b-demo" onclick="demoSignIn()">Use the demo organiser</button>
+      <div class="err" id="s-err"></div>
+    </div></div>
+    <p class="hint" style="padding:0 4px">Only the organiser signs in. Everyone else just opens the link.</p>
+  </section>
+
+  <section id="phone" class="hidden">
+    <h2>Trips on this phone</h2>
+    <div class="card" id="phone-list"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const API = '/api';
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'MXN', 'JPY', 'AUD', 'INR', 'CHF', 'THB', 'AED', 'SGD', 'NZD', 'ZAR', 'BRL', 'CRC', 'ISK', 'TRY', 'CZK', 'HUF', 'DKK', 'SEK', 'NOK', 'MAD'];
+let sb = null, AUTH = '', lastShared = null;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+async function api(action, extra) {
+  const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, auth: AUTH }, extra || {})) });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(body.error || 'Something went wrong.'); e.status = r.status; throw e; }
+  return body;
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+const fmtDay = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const range = (a, b) => a && b ? fmtDay(a) + ' to ' + fmtDay(b) : '';
+const linkFor = (token) => location.origin + '/trip#' + token;
+
+// ── Signing in ──────────────────────────────────────────────────────────────
+async function oauth(provider) {
+  if (!sb) return;
+  const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + '/' } });
+  if (error) document.getElementById('s-err').textContent = error.message;
+}
+async function emailLink() {
+  const email = document.getElementById('email').value.trim();
+  const err = document.getElementById('s-err');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = 'That email address does not look right.'; return; }
+  if (!sb) return;
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + '/' } });
+  err.style.color = error ? '' : 'var(--good)';
+  err.textContent = error ? error.message : 'Check your email for the sign-in link.';
+}
+// Only offered against the local stand-in database, which accepts this token.
+function demoSignIn() { AUTH = 'demo-organiser'; sessionStorage.setItem('gt.demo', '1'); showSignedIn(); }
+async function signOut() {
+  if (sb) await sb.auth.signOut();
+  sessionStorage.removeItem('gt.demo');
+  AUTH = '';
+  showSignedOut();
+}
+
+function showSignedOut() {
+  document.getElementById('signed-in').classList.add('hidden');
+  document.getElementById('signout').classList.add('hidden');
+  document.getElementById('signed-out').classList.remove('hidden');
+}
+async function showSignedIn() {
+  document.getElementById('signed-out').classList.add('hidden');
+  document.getElementById('signed-in').classList.remove('hidden');
+  document.getElementById('signout').classList.remove('hidden');
+  await loadMine();
+}
+
+// ── Trips you organise ──────────────────────────────────────────────────────
+async function loadMine() {
+  const host = document.getElementById('mine');
+  host.textContent = '';
+  host.appendChild(el('div', 'empty', 'Loading…'));
+  try {
+    const { trips } = await api('my_trips');
+    host.textContent = '';
+    if (!trips.length) host.appendChild(el('div', 'empty', 'No trips yet. Plan your first one below.'));
+    for (const t of trips) host.appendChild(tripRow(t, true));
+  } catch (e) {
+    host.textContent = '';
+    host.appendChild(el('div', 'empty', e.message));
+    if (e.status === 401) signOut();
+  }
+}
+
+function tripRow(t, organiser) {
+  const row = el('div', 'trip');
+  const name = el('a', 'n', t.name);
+  name.href = t.token ? '/trip#' + t.token : '#';
+  row.appendChild(name);
+  row.appendChild(el('div', 'd', range(t.start_date || t.start, t.end_date || t.end)));
+  if (organiser && t.token) {
+    const acts = el('div', 'acts');
+    const copy = el('button', 'linkish', 'Copy link');
+    copy.onclick = () => copyText(linkFor(t.token), copy);
+    acts.appendChild(copy);
+    const fresh = el('button', 'linkish', 'Issue a new link');
+    fresh.onclick = () => rotate(t);
+    acts.appendChild(fresh);
+    row.appendChild(acts);
+  }
+  return row;
+}
+
+// For a link forwarded beyond the group: the old one stops working at once.
+async function rotate(t) {
+  if (!confirm('Issue a new link for ' + t.name + '?\n\nThe old link stops working straight away, so everyone on the trip will need the new one.')) return;
+  try {
+    const { token } = await api('invite_rotate', { trip_id: t.id });
+    showShare(t.name, token, 'New link for ' + t.name);
+    loadMine();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Creating a trip ─────────────────────────────────────────────────────────
+function fillCurrencies() {
+  const guess = (Intl.NumberFormat().resolvedOptions().locale || '').endsWith('-GB') ? 'GBP' : 'USD';
+  for (const [id, def] of [['c-cur', 'EUR'], ['c-home', guess]]) {
+    const s = document.getElementById(id);
+    for (const c of CURRENCIES) { const o = el('option', null, c); o.value = c; s.appendChild(o); }
+    s.value = def;
+    s.onchange = updateRate;
+  }
+  updateRate();
+}
+function updateRate() {
+  const cur = document.getElementById('c-cur').value, home = document.getElementById('c-home').value;
+  document.getElementById('c-rate-row').classList.toggle('hidden', cur === home);
+  document.getElementById('c-rate-label').textContent = 'How many ' + home + ' to one ' + cur;
+}
+function showCreate() {
+  document.getElementById('create').classList.remove('hidden');
+  document.getElementById('create-btn').classList.add('hidden');
+  document.getElementById('c-name').focus();
+}
+function hideCreate() {
+  document.getElementById('create').classList.add('hidden');
+  document.getElementById('create-btn').classList.remove('hidden');
+}
+
+async function createTrip() {
+  const err = document.getElementById('c-err');
+  err.textContent = '';
+  const v = (id) => document.getElementById(id).value.trim();
+  const cur = v('c-cur'), home = v('c-home');
+  const rate = Number(v('c-rate').replace(',', '.'));
+  if (!v('c-name')) { err.textContent = 'Give the trip a name.'; return; }
+  if (!v('c-start') || !v('c-end')) { err.textContent = 'Choose the first and last day.'; return; }
+  if (cur !== home && !(rate > 0)) { err.textContent = 'Add the agreed rate, like 1.08.'; return; }
+  try {
+    const { trip } = await api('trip_create', {
+      name: v('c-name'), start_date: v('c-start'), end_date: v('c-end'),
+      currency: cur, home_currency: home, rate: cur === home ? 1 : rate,
+      people: v('c-people').split('\n').map(s => s.trim()).filter(Boolean),
+    });
+    hideCreate();
+    for (const id of ['c-name', 'c-start', 'c-end', 'c-rate', 'c-people']) document.getElementById(id).value = '';
+    showShare(trip.name, trip.token, trip.name + ' is ready');
+    loadMine();
+  } catch (e) { err.textContent = e.message; }
+}
+
+// ── Sharing the link ────────────────────────────────────────────────────────
+function showShare(name, token, title) {
+  lastShared = { name, url: linkFor(token) };
+  document.getElementById('share-title').textContent = title;
+  document.getElementById('share-link').textContent = lastShared.url;
+  document.getElementById('share-open').href = '/trip#' + token;
+  document.getElementById('share-native').classList.toggle('hidden', !navigator.share);
+  document.getElementById('share').classList.remove('hidden');
+  window.scrollTo && window.scrollTo(0, 0);
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch (e) { prompt('Copy this link', text); return; }
+  if (btn) { const was = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => (btn.textContent = was), 1500); }
+}
+function copyLink(btn) { if (lastShared) copyText(lastShared.url, btn); }
+async function shareLink() {
+  if (!lastShared || !navigator.share) return;
+  try { await navigator.share({ title: lastShared.name, text: 'Our trip plan for ' + lastShared.name + '. Open it, pick your name, and add anything you find.', url: lastShared.url }); } catch (e) {}
+}
+
+// ── Trips this phone has opened ─────────────────────────────────────────────
+// Guests never sign in, so their list lives here, written by the trip page.
+function showPhoneTrips() {
+  const list = store.get('gt.trips', {});
+  const entries = Object.entries(list).sort((a, b) => String(a[1].start).localeCompare(String(b[1].start)));
+  const host = document.getElementById('phone-list');
+  host.textContent = '';
+  document.getElementById('phone').classList.toggle('hidden', !entries.length);
+  for (const [token, t] of entries) host.appendChild(tripRow(Object.assign({ token }, t), false));
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+(async function boot() {
+  fillCurrencies();
+  showPhoneTrips();
+  let cfg = {};
+  try { cfg = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"config"}' }).then(r => r.json()); } catch (e) {}
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (cfg.anonKey && window.supabase) {
+    sb = window.supabase.createClient(cfg.supabaseUrl, cfg.anonKey);
+    sb.auth.onAuthStateChange((_event, session) => {
+      const next = session ? session.access_token : '';
+      if (next === AUTH) return;
+      AUTH = next;
+      if (AUTH) showSignedIn(); else showSignedOut();
+    });
+    const { data } = await sb.auth.getSession();
+    AUTH = data.session ? data.session.access_token : '';
+  } else {
+    for (const id of ['b-apple', 'b-google']) document.getElementById(id).disabled = true;
+    document.getElementById('s-err').textContent = local ? 'Sign-in is not connected here; the demo organiser works against the local database.' : 'Sign-in is not set up yet.';
+    if (local) document.getElementById('b-demo').classList.remove('hidden');
+    if (local && sessionStorage.getItem('gt.demo')) AUTH = 'demo-organiser';
+  }
+  if (AUTH) showSignedIn(); else showSignedOut();
+})();
+</script>
+</body>
+</html>
